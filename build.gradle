@@ -1,0 +1,93 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '2.2.21'
+    id 'org.jetbrains.kotlin.plugin.spring' version '2.2.21'
+    id 'org.springframework.boot' version '4.0.3'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.jetbrains.kotlin.plugin.jpa' version '2.2.21'
+
+    id 'org.openapi.generator' version '7.4.0' 
+}
+
+group = 'com.laura.aviles'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    set('springAiVersion', "2.0.0-M2")
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-validation' // Necesario para los @Valid del Swagger
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-s3'
+    implementation 'tools.jackson.module:jackson-module-kotlin'
+    implementation 'org.web3j:web3j-spring-boot-starter:4.11.0'
+    
+    // Dependencias necesarias para el código generado
+    implementation 'jakarta.validation:jakarta.validation-api'
+    
+    runtimeOnly 'org.postgresql:postgresql'
+    
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5'
+}
+
+// 2. Configuración de la tarea de generación
+openApiGenerate {
+    generatorName.set("kotlin-spring")
+    inputSpec.set("$rootDir/src/main/resources/openapi.yaml") // Tu contrato debe estar aquí
+    outputDir.set("$buildDir/generated")
+    apiPackage.set("com.laura.aviles.api")
+    modelPackage.set("com.laura.aviles.model.dto")
+    configOptions.set([
+        interfaceOnly: "true",      // Solo crea las interfaces, tú las implementas
+        useSpringBoot3: "true",     // Compatible con Spring Boot 3/4 (Jakarta EE)
+        useTags: "true",            // Organiza por tags del Swagger
+        serializationLibrary: "jackson",
+        enumPropertyNaming: "original"
+    ])
+}
+
+// 3. Decirle a Kotlin que mire la carpeta de archivos generados
+sourceSets {
+    main {
+        kotlin {
+            srcDir "$buildDir/generated/src/main/kotlin"
+        }
+    }
+}
+
+// 4. Asegurar que el código se genere antes de compilar
+compileKotlin.dependsOn tasks.openApiGenerate
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.addAll '-Xjsr305=strict', '-Xannotation-default-target=param-property'
+    }
+}
+
+allOpen {
+    annotation 'jakarta.persistence.Entity'
+    annotation 'jakarta.persistence.MappedSuperclass'
+    annotation 'jakarta.persistence.Embeddable'
+}
